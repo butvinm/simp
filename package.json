@@ -1,0 +1,14 @@
+{
+    "name": "simp",
+    "version": "1.0.0",
+    "main": "index.js",
+    "license": "MIT",
+    "type": "module",
+    "devDependencies": {
+        "@types/node": "^20.14.2"
+    },
+    "dependencies": {
+        "node-html-parser": "^6.1.13",
+        "typescript": "^5.4.5"
+    }
+}
