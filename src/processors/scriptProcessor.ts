@@ -1,17 +1,32 @@
 import ts from 'typescript'
 
-type Processor = {
+
+export type ScriptProcessor = {
     reactive: Set<string>
 }
 
+export function processScript(
+    processor: ScriptProcessor,
+    script: string,
+): string {
+    let result = ts.transpileModule(script, {
+        compilerOptions: {
+            module: ts.ModuleKind.ES2015,
+            target: ts.ScriptTarget.ES2015,
+        },
+        transformers: {
+            before: [(context) => transformerFactory(processor, context)],
+        },
+    })
+
+    return result.outputText
+}
+
 function transformerFactory(
+    processor: ScriptProcessor,
     context: ts.TransformationContext,
 ): ts.Transformer<ts.SourceFile> {
     return (sourceFile: ts.SourceFile) => {
-        const processor: Processor = {
-            reactive: new Set(),
-        }
-
         const visitor = (node: ts.Node): ts.Node => {
             return transformNode(processor, node, context)
         }
@@ -21,7 +36,7 @@ function transformerFactory(
 }
 
 function transformNode(
-    processor: Processor,
+    processor: ScriptProcessor,
     node: ts.Node,
     context: ts.TransformationContext,
 ): ts.Node {
@@ -49,7 +64,7 @@ function transformNode(
 }
 
 function transformVariableDeclarationList(
-    processor: Processor,
+    processor: ScriptProcessor,
     node: ts.VariableDeclarationList,
 ): ts.VariableDeclarationList {
     return ts.factory.updateVariableDeclarationList(
@@ -67,16 +82,22 @@ function transformVariableDeclarationList(
 function transformReactiveVariableDeclaration(
     declaration: ts.VariableDeclaration,
 ): ts.VariableDeclaration {
+    // new ReactiveVariable('name', value)
+    const reactiveInitializer = ts.factory.createNewExpression(
+        ts.factory.createIdentifier('ReactiveVariable'),
+        undefined,
+        [
+            ts.factory.createStringLiteral(declaration.name.getText()),
+            declaration.initializer!
+        ],
+    )
+
     return ts.factory.updateVariableDeclaration(
         declaration,
         declaration.name,
         declaration.exclamationToken,
         declaration.type,
-        ts.factory.createCallExpression(
-            ts.factory.createIdentifier('reactive'),
-            undefined,
-            [declaration.initializer!],
-        ),
+        reactiveInitializer,
     )
 }
 
@@ -102,18 +123,4 @@ function transformReactiveIdentifier(node: ts.Identifier): ts.CallExpression {
         undefined,
         [],
     )
-}
-
-export function processScript(script: string): string {
-    let result = ts.transpileModule(script, {
-        compilerOptions: {
-            module: ts.ModuleKind.ES2015,
-            target: ts.ScriptTarget.ES2015,
-        },
-        transformers: {
-            before: [transformerFactory],
-        },
-    })
-
-    return result.outputText
 }

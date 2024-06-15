@@ -12,7 +12,8 @@
 import * as fs from 'fs'
 import { HTMLElement, NodeType, parse } from 'node-html-parser'
 import * as path from 'path'
-import { processScript } from './processors/scriptProcessor'
+import { processScript, ScriptProcessor } from './processors/scriptProcessor'
+import { HtmlProcessor, processHtml } from './processors/htmlProcessor'
 
 const INDEX_HTML = `
 <!DOCTYPE html>
@@ -29,26 +30,52 @@ const INDEX_HTML = `
 `
 
 const JS_HEADER = `
-import { reactive } from "./runtime.js";
+import { ReactiveVariable } from './runtime.js';
+
+const root = document.createElement('div');
+`
+
+const JS_FOOTER = `
+document.body.appendChild(root);
 `
 
 function buildIndexJs(simpSource: string): string {
+    const scriptProcessor: ScriptProcessor = {
+        reactive: new Set(),
+    }
+
+    const htmlProcessor: HtmlProcessor = {
+        elementsCounter: 0,
+        indent: 0,
+    }
+
     const root = parse(simpSource)
 
     let jsOutput = JS_HEADER
+
     for (const child of root.childNodes) {
         if (child.nodeType === NodeType.ELEMENT_NODE) {
             const element = child as HTMLElement
             if (element.rawTagName === 'script') {
-                jsOutput += processScript(element.text)
+                jsOutput += processScript(scriptProcessor, element.text)
             } else if (element.rawTagName === 'style') {
-                // process style block
-            } else {
                 // process other tags
+            } else {
+                const {nodeName, nodeDeclaration} = processHtml(htmlProcessor, element)
+                const indent = '    '.repeat(htmlProcessor.indent)
+                jsOutput += `${indent}${nodeDeclaration}\n`
+                jsOutput += `${indent}root.appendChild(${nodeName});\n`
             }
         }
     }
 
+    jsOutput += 'addEventListener("load", () => {\n'
+    for (const reactiveVariable of scriptProcessor.reactive) {
+        jsOutput += `    ${reactiveVariable}.invoke();\n`
+    }
+    jsOutput += '});\n'
+
+    jsOutput += JS_FOOTER
     return jsOutput
 }
 

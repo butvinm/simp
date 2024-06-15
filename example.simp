@@ -1,0 +1,10 @@
+<script>
+    let count = 0;
+
+    console.log(count);
+</script>
+
+<h1>Counter</h1>
+<button onclick="count.set(count.get() + 1)">Increment</button>
+<p>{count}</p>
+<button onclick="count.set(count.get() - 1)">Decrement</button>
