@@ -15,6 +15,7 @@ import * as path from 'path'
 import { processHtmlNode } from './processors/htmlProcessor'
 import { SimpContext } from './processors/processor'
 import { processScriptNode } from './processors/scriptProcessor'
+import { processStyleNode } from './processors/styleProcessor'
 
 const INDEX_HTML = `
 <!DOCTYPE html>
@@ -60,7 +61,7 @@ function buildIndexJs(simpSource: string): string {
             if (element.rawTagName === 'script') {
                 jsOutput += processScriptNode(element, ctx) + '\n'
             } else if (element.rawTagName === 'style') {
-                // process other tags
+                jsOutput += processStyleNode(element, ctx) + '\n'
             } else {
                 jsOutput += processHtmlNode(element, ctx) + '\n'
             }

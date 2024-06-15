@@ -4,17 +4,102 @@
     console.log(count)
 </script>
 
-<div>
-    <h1>Counter</h1>
-    <button on:click="{{ count = count + 1 }}">Increment</button>
-    <p>{{ "clicked: " + count }}</p>
-    <p>{{ "clicked x2: " + count * 2 }}</p>
-    <button on:click="{{ count = count - 1 }}">Decrement</button>
+<div class="wrapper">
+    <section class="section">
+        <div class="title-wrapper">
+            <h1 class="title">Simp</h1>
+            <h3 class="subtitle">Make web simple again.</h3>
+        </div>
+        <div class="counter-wrapper">
+            <button class="counter-btn" on:click="{{ count = count - 1 }}">Decrement</button>
+            <p class="counter">{{ count }}</p>
+            <button class="counter-btn" on:click="{{ count = count + 1 }}">Increment</button>
+        </div>
+    </section>
+    <footer class="footer">
+        <p>2024 butvinm</p>
+        <p><a class="github-link" href="https://github.com/butvinm/simp.git">GitHub</a></p>
+    </footer>
 </div>
 
 <style>
-    button {
-        padding: 10px;
-        margin: 10px;
+    html {
+        font-family: monospace;
+    }
+
+    body {
+        margin: 0;
+        padding: 0;
+        width: 100vw;
+        height: 100vh;
+    }
+
+    .wrapper {
+        display: flex;
+        justify-content: space-between;
+        align-items: stretch;
+        flex-direction: column;
+        height: 100%;
+        width: 100%;
+    }
+
+    .section {
+        flex-grow: 1;
+        padding: 10rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: center;
+        gap: 3rem;
+    }
+
+    .title-wrapper {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .title {
+        font-size: 12rem;
+        margin: 0;
+    }
+
+    .subtitle {
+        color: crimson;
+    }
+
+    .counter-wrapper {
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+        align-items: center;
+        gap: 3rem;
+    }
+
+    .counter-btn {
+        padding: 1rem;
+        font-size: 1.5rem;
+        background-color: #ffffff;
+        border: 3px solid black;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+
+    .counter {
+        font-size: 3rem;
+        color: crimson;
+    }
+
+    .footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0 1rem;
+    }
+
+    .github-link {
+        color: black;
+        text-decoration: none;
     }
 </style>
