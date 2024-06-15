@@ -6,3 +6,4 @@ micros:
     engine: static
     serve: simpDist
     primary: true
+    public: true
