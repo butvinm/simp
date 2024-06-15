@@ -1,33 +1,33 @@
 export class ReactiveVariable<T> {
-    private value: T;
-    private callbacks: ((newValue: T) => void)[] = [];
+    private value: T
+    private callbacks: ((newValue: T) => void)[] = []
 
     constructor(value: T) {
-        this.value = value;
+        this.value = value
     }
 
     get() {
-        return this.value;
+        return this.value
     }
 
     set(value: T) {
-        this.value = value;
-        this.invoke();
+        this.value = value
+        this.invoke()
     }
 
     subscribe(callback: (newValue: T) => void) {
-        this.callbacks.push(callback);
+        this.callbacks.push(callback)
     }
 
     unsubscribe(callback: (newValue: T) => void) {
-        this.callbacks = this.callbacks.filter((cb) => cb !== callback);
+        this.callbacks = this.callbacks.filter((cb) => cb !== callback)
     }
 
     invoke() {
-        this.callbacks.forEach((callback) => callback(this.value));
+        this.callbacks.forEach((callback) => callback(this.value))
     }
 }
 
 export function reactive<T>(value: T) {
-    return new ReactiveVariable(value);
+    return new ReactiveVariable(value)
 }

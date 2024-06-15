@@ -4,11 +4,21 @@
     "main": "index.js",
     "license": "MIT",
     "type": "module",
+    "scripts": {
+        "node-sanity": "node --import=extensionless/register"
+    },
     "devDependencies": {
-        "@types/node": "^20.14.2"
+        "@types/node": "^20.14.2",
+        "extensionless": "^1.9.9"
     },
     "dependencies": {
         "node-html-parser": "^6.1.13",
         "typescript": "^5.4.5"
+    },
+    "prettier": {
+        "trailingComma": "all",
+        "tabWidth": 4,
+        "semi": false,
+        "singleQuote": true
     }
 }

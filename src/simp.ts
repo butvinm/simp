@@ -9,10 +9,10 @@
  *
  * A whole simp file is compiled to a single js file that can be included in a web page.
  */
-import * as fs from "fs";
-import { HTMLElement, NodeType, parse } from "node-html-parser";
-import * as path from "path";
-import { processScript } from "./scriptProcessor.js";
+import * as fs from 'fs'
+import { HTMLElement, NodeType, parse } from 'node-html-parser'
+import * as path from 'path'
+import { processScript } from './processors/scriptProcessor'
 
 const INDEX_HTML = `
 <!DOCTYPE html>
@@ -26,22 +26,22 @@ const INDEX_HTML = `
         <script src="index.js" type="module"></script>
     </body>
 </html>
-`;
+`
 
 const JS_HEADER = `
 import { reactive } from "./runtime.js";
-`;
+`
 
 function buildIndexJs(simpSource: string): string {
-    const root = parse(simpSource);
+    const root = parse(simpSource)
 
-    let jsOutput = JS_HEADER;
+    let jsOutput = JS_HEADER
     for (const child of root.childNodes) {
         if (child.nodeType === NodeType.ELEMENT_NODE) {
-            const element = child as HTMLElement;
-            if (element.rawTagName === "script") {
-                jsOutput += processScript(element.text);
-            } else if (element.rawTagName === "style") {
+            const element = child as HTMLElement
+            if (element.rawTagName === 'script') {
+                jsOutput += processScript(element.text)
+            } else if (element.rawTagName === 'style') {
                 // process style block
             } else {
                 // process other tags
@@ -49,34 +49,34 @@ function buildIndexJs(simpSource: string): string {
         }
     }
 
-    return jsOutput;
+    return jsOutput
 }
 
-const OUT_DIR = "simpDist";
+const OUT_DIR = 'simpDist'
 
 function main() {
     if (process.argv.length < 3) {
-        console.log("Usage: simp <simp-file>");
-        process.exit(1);
+        console.log('Usage: simp <simp-file>')
+        process.exit(1)
     }
 
-    const simpFile = process.argv[2]!;
+    const simpFile = process.argv[2]!
 
-    const simpSource = fs.readFileSync(simpFile, "utf-8");
+    const simpSource = fs.readFileSync(simpFile, 'utf-8')
 
-    const jsOutput = buildIndexJs(simpSource);
+    const jsOutput = buildIndexJs(simpSource)
 
     if (!fs.existsSync(OUT_DIR)) {
-        fs.mkdirSync(OUT_DIR);
+        fs.mkdirSync(OUT_DIR)
     }
 
-    const jsFile = path.join(OUT_DIR, "index.js");
-    fs.writeFileSync(jsFile, jsOutput);
+    const jsFile = path.join(OUT_DIR, 'index.js')
+    fs.writeFileSync(jsFile, jsOutput)
 
-    const htmlFile = path.join(OUT_DIR, "index.html");
-    fs.writeFileSync(htmlFile, INDEX_HTML);
+    const htmlFile = path.join(OUT_DIR, 'index.html')
+    fs.writeFileSync(htmlFile, INDEX_HTML)
 
-    console.log(`Output written to ${jsFile}`);
+    console.log(`Output written to ${jsFile}`)
 }
 
-main();
+main()
