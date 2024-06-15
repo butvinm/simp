@@ -1,77 +1,64 @@
+import { HTMLElement } from 'node-html-parser'
 import ts from 'typescript'
+import { SimpContext } from './processor'
 
-
-export type ScriptProcessor = {
-    reactive: Set<string>
+export function processScriptNode(node: HTMLElement, ctx: SimpContext): string {
+    return processScript(node.text, ctx)
 }
 
-export function processScript(
-    processor: ScriptProcessor,
-    script: string,
-): string {
-    let result = ts.transpileModule(script, {
+export function processScript(script: string, ctx: SimpContext): string {
+    const processedScript = ts.transpileModule(script, {
         compilerOptions: {
             module: ts.ModuleKind.ES2015,
             target: ts.ScriptTarget.ES2015,
         },
         transformers: {
-            before: [(context) => transformerFactory(processor, context)],
+            before: [(context) => transformerFactory(ctx, context)],
         },
     })
-
-    return result.outputText
+    
+    return processedScript.outputText.trim()
 }
 
-function transformerFactory(
-    processor: ScriptProcessor,
-    context: ts.TransformationContext,
-): ts.Transformer<ts.SourceFile> {
+function transformerFactory(ctx: SimpContext, context: ts.TransformationContext): ts.Transformer<ts.SourceFile> {
     return (sourceFile: ts.SourceFile) => {
         const visitor = (node: ts.Node): ts.Node => {
-            return transformNode(processor, node, context)
+            return transformNode(node, ctx, context)
         }
 
         return ts.visitNode(sourceFile, visitor) as ts.SourceFile
     }
 }
 
-function transformNode(
-    processor: ScriptProcessor,
-    node: ts.Node,
-    context: ts.TransformationContext,
-): ts.Node {
+function transformNode(node: ts.Node, ctx: SimpContext, context: ts.TransformationContext): ts.Node {
     if (ts.isVariableDeclarationList(node) && node.flags === ts.NodeFlags.Let) {
-        return transformVariableDeclarationList(processor, node)
+        return transformVariableDeclarationList(node, ctx)
     }
 
     if (
         ts.isBinaryExpression(node) &&
         node.operatorToken.kind === ts.SyntaxKind.FirstAssignment &&
-        processor.reactive.has(node.left.getText())
+        ctx.reactives.has(node.left.getText())
     ) {
-        return transformReactiveAssignment(node)
+        return transformReactiveAssignment(node, ctx, context)
     }
 
-    if (ts.isIdentifier(node) && processor.reactive.has(node.getText())) {
+    if (ts.isIdentifier(node) && ctx.reactives.has(node.getText())) {
         return transformReactiveIdentifier(node)
     }
 
-    return ts.visitEachChild(
-        node,
-        (childNode) => transformNode(processor, childNode, context),
-        context,
-    )
+    return ts.visitEachChild(node, (childNode) => transformNode(childNode, ctx, context), context)
 }
 
 function transformVariableDeclarationList(
-    processor: ScriptProcessor,
     node: ts.VariableDeclarationList,
+    ctx: SimpContext,
 ): ts.VariableDeclarationList {
     return ts.factory.updateVariableDeclarationList(
         node,
         node.declarations.map((declaration) => {
             if (declaration.initializer !== undefined) {
-                processor.reactive.add(declaration.name.getText())
+                ctx.reactives.add(declaration.name.getText())
                 return transformReactiveVariableDeclaration(declaration)
             }
             return declaration
@@ -79,17 +66,12 @@ function transformVariableDeclarationList(
     )
 }
 
-function transformReactiveVariableDeclaration(
-    declaration: ts.VariableDeclaration,
-): ts.VariableDeclaration {
+function transformReactiveVariableDeclaration(declaration: ts.VariableDeclaration): ts.VariableDeclaration {
     // new ReactiveVariable('name', value)
     const reactiveInitializer = ts.factory.createNewExpression(
         ts.factory.createIdentifier('ReactiveVariable'),
         undefined,
-        [
-            ts.factory.createStringLiteral(declaration.name.getText()),
-            declaration.initializer!
-        ],
+        [ts.factory.createStringLiteral(declaration.name.getText()), declaration.initializer!],
     )
 
     return ts.factory.updateVariableDeclaration(
@@ -103,6 +85,8 @@ function transformReactiveVariableDeclaration(
 
 function transformReactiveAssignment(
     node: ts.BinaryExpression,
+    ctx: SimpContext,
+    context: ts.TransformationContext,
 ): ts.CallExpression {
     return ts.factory.createCallExpression(
         ts.factory.createPropertyAccessExpression(
@@ -110,7 +94,7 @@ function transformReactiveAssignment(
             ts.factory.createIdentifier('set'),
         ),
         undefined,
-        [node.right],
+        [transformNode(node.right, ctx, context) as ts.Expression],
     )
 }
 

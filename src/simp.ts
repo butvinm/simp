@@ -12,8 +12,9 @@
 import * as fs from 'fs'
 import { HTMLElement, NodeType, parse } from 'node-html-parser'
 import * as path from 'path'
-import { processScript, ScriptProcessor } from './processors/scriptProcessor'
-import { HtmlProcessor, processHtml } from './processors/htmlProcessor'
+import { processHtmlNode } from './processors/htmlProcessor'
+import { SimpContext } from './processors/processor'
+import { processScriptNode } from './processors/scriptProcessor'
 
 const INDEX_HTML = `
 <!DOCTYPE html>
@@ -29,53 +30,44 @@ const INDEX_HTML = `
 </html>
 `
 
-const JS_HEADER = `
-import { ReactiveVariable } from './runtime.js';
+function preludeIndexJs(ctx: SimpContext): string {
+    return `import { ReactiveVariable } from './runtime.js';`
+}
 
-const root = document.createElement('div');
-`
-
-const JS_FOOTER = `
-document.body.appendChild(root);
-`
+function epilogueIndexJs(ctx: SimpContext): string {
+    let jsOutput = 'addEventListener("load", () => {\n'
+    for (const reactiveVariable of ctx.reactives) {
+        jsOutput += `    ${reactiveVariable}.invoke();\n`
+    }
+    jsOutput += '});\n'
+    return jsOutput
+}
 
 function buildIndexJs(simpSource: string): string {
-    const scriptProcessor: ScriptProcessor = {
-        reactive: new Set(),
-    }
-
-    const htmlProcessor: HtmlProcessor = {
-        elementsCounter: 0,
+    const ctx: SimpContext = {
         indent: 0,
+        elements: 0,
+        reactives: new Set(),
     }
 
     const root = parse(simpSource)
 
-    let jsOutput = JS_HEADER
+    let jsOutput = preludeIndexJs(ctx) + '\n'
 
     for (const child of root.childNodes) {
         if (child.nodeType === NodeType.ELEMENT_NODE) {
             const element = child as HTMLElement
             if (element.rawTagName === 'script') {
-                jsOutput += processScript(scriptProcessor, element.text)
+                jsOutput += processScriptNode(element, ctx) + '\n'
             } else if (element.rawTagName === 'style') {
                 // process other tags
             } else {
-                const {nodeName, nodeDeclaration} = processHtml(htmlProcessor, element)
-                const indent = '    '.repeat(htmlProcessor.indent)
-                jsOutput += `${indent}${nodeDeclaration}\n`
-                jsOutput += `${indent}root.appendChild(${nodeName});\n`
+                jsOutput += processHtmlNode(element, ctx) + '\n'
             }
         }
     }
 
-    jsOutput += 'addEventListener("load", () => {\n'
-    for (const reactiveVariable of scriptProcessor.reactive) {
-        jsOutput += `    ${reactiveVariable}.invoke();\n`
-    }
-    jsOutput += '});\n'
-
-    jsOutput += JS_FOOTER
+    jsOutput += epilogueIndexJs(ctx)
     return jsOutput
 }
 

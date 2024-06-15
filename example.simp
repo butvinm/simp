@@ -1,10 +1,20 @@
 <script>
-    let count = 0;
-
-    console.log(count);
+    const x = 10
+    let count = 0
+    console.log(count)
 </script>
 
-<h1>Counter</h1>
-<button onclick="count.set(count.get() + 1)">Increment</button>
-<p>{count}</p>
-<button onclick="count.set(count.get() - 1)">Decrement</button>
+<div>
+    <h1>Counter</h1>
+    <button on:click="{{ count = count + 1 }}">Increment</button>
+    <p>{{ "clicked: " + count }}</p>
+    <p>{{ "clicked x2: " + count * 2 }}</p>
+    <button on:click="{{ count = count - 1 }}">Decrement</button>
+</div>
+
+<style>
+    button {
+        padding: 10px;
+        margin: 10px;
+    }
+</style>

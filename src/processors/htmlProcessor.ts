@@ -1,106 +1,91 @@
 import { HTMLElement, NodeType } from 'node-html-parser'
 
-export interface HtmlProcessor {
-    elementsCounter: number
-    indent: number
+import { SimpContext } from './processor'
+import { extractReactiveClosure, extractClosureReactives } from '../parseUtils'
+import { processScript, processScriptNode } from './scriptProcessor'
+
+export function processHtmlNode(node: HTMLElement, ctx: SimpContext): string {
+    const result = processNode(node, ctx)
+    if (!result) {
+        return ''
+    }
+
+    let htmlOutput = result.nodeDeclaration + '\n'
+    htmlOutput += `document.body.appendChild(${result.nodeName});`
+    return htmlOutput
 }
 
-export function processHtml(
-    processor: HtmlProcessor,
-    node: HTMLElement,
-): { nodeName: string; nodeDeclaration: string } {
-    return processNode(processor, node)
-}
+type NodeProcessorResult = { nodeName: string; nodeDeclaration: string }
 
-const reactiveClosure = /{([^}]+)}/g
-
-function processNode(
-    processor: HtmlProcessor,
-    node: HTMLElement,
-): { nodeName: string; nodeDeclaration: string } {
-    processor.elementsCounter += 1
-
+function processNode(node: HTMLElement, ctx: SimpContext): NodeProcessorResult | null {
+    ctx.elements += 1
     switch (node.nodeType) {
         case NodeType.TEXT_NODE:
-            return convertTextNode(processor, node)
+            return convertTextNode(node, ctx)
         case NodeType.ELEMENT_NODE:
-            return convertElementNode(processor, node)
+            return convertElementNode(node, ctx)
         default:
-            throw new Error(`Unknown node type: ${node.nodeType}`)
+            return null
     }
 }
 
-function convertTextNode(
-    processor: HtmlProcessor,
-    node: HTMLElement,
-): { nodeName: string; nodeDeclaration: string } {
-    const nodeName = `textNode${processor.elementsCounter}`
-    let text = JSON.stringify(node.text)
-    let nodeDeclaration = `const ${nodeName} = document.createTextNode(${text});`
+function convertTextNode(node: HTMLElement, ctx: SimpContext): NodeProcessorResult {
+    const nodeName = `textNode${ctx.elements}`
+    let escapedText = JSON.stringify(node.text)
+    let nodeDeclaration = `const ${nodeName} = document.createTextNode(${escapedText});`
 
-    processor.indent += 1
-    const reactiveClosureMatches = text.match(reactiveClosure)
-    if (reactiveClosureMatches) {
-        for (const closure of reactiveClosureMatches) {
-            const reactiveVariableName = closure.slice(1, -1)
-            text = text.replace(
-                closure,
-                `document.createTextNode(${reactiveVariableName}.get())`,
-            )
-            const indent = '    '.repeat(processor.indent)
-            nodeDeclaration += `\n${indent}${reactiveVariableName}.subscribe((newValue) => ${nodeName}.textContent = newValue);`
+    ctx.indent += 1
+    const indent = '    '.repeat(ctx.indent)
+
+    const reactiveClosure = extractReactiveClosure(node.text)
+    if (reactiveClosure) {
+        const processedClosure = processScript(reactiveClosure, ctx)
+        const closureClosureReactives = extractClosureReactives(reactiveClosure, ctx.reactives)
+        for (const reactive of closureClosureReactives) {
+            nodeDeclaration += `\n${indent}${reactive}.subscribe((newValue) => { ${nodeName}.textContent = ${processedClosure} });`
         }
     }
-    processor.indent -= 1
+
+    ctx.indent -= 1
     return { nodeName, nodeDeclaration }
 }
 
-function convertElementNode(
-    processor: HtmlProcessor,
-    node: HTMLElement,
-): { nodeName: string; nodeDeclaration: string } {
+function convertElementNode(node: HTMLElement, ctx: SimpContext): NodeProcessorResult {
     const rawTagName = node.rawTagName || 'body'
-    const nodeName = `${rawTagName}${processor.elementsCounter}`
+    const nodeName = `${rawTagName}${ctx.elements}`
     let nodeDeclaration = `const ${nodeName} = document.createElement("${rawTagName}");`
 
-    processor.indent += 1
+    ctx.indent += 1
+    const indent = '    '.repeat(ctx.indent)
 
     for (const [attr, value] of Object.entries(node.rawAttributes)) {
-        if (attr.startsWith('on')) {
-            const eventName = attr.slice(2)
-            const indent = '    '.repeat(processor.indent)
-            nodeDeclaration += `\n${indent}${nodeName}.addEventListener("${eventName}", (event) => { ${value} });`
-        } else {
-            const reactiveClosureMatches = value.match(reactiveClosure)
-            if (reactiveClosureMatches) {
-                for (const closure of reactiveClosureMatches) {
-                    const reactiveVariableName = closure.slice(1, -1)
-                    const valueExpr = value.replace(
-                        closure,
-                        `${reactiveVariableName}.get()`,
-                    )
-                    const indent = '    '.repeat(processor.indent)
-                    nodeDeclaration += `\n${indent}${reactiveVariableName}.subscribe((newValue) => ${nodeName}.setAttribute("${attr}", newValue));`
-                    nodeDeclaration += `\n${indent}${nodeName}.setAttribute("${attr}", ${valueExpr});`
-                }
+        const reactiveClosure = extractReactiveClosure(value)
+        if (reactiveClosure) {
+            const processedClosure = processScript(reactiveClosure, ctx)
+
+            if (attr.startsWith('on:')) {
+                const eventName = attr.slice(3)
+                nodeDeclaration += `\n${indent}${nodeName}.addEventListener("${eventName}", (event) => { ${processedClosure} });`
             } else {
-                const indent = '    '.repeat(processor.indent)
-                nodeDeclaration += `\n${indent}${nodeName}.setAttribute("${attr}", ${JSON.stringify(
-                    value,
-                )});`
+                const reactives = extractClosureReactives(reactiveClosure, ctx.reactives)
+                for (const reactive of reactives) {
+                    nodeDeclaration += `\n${indent}${reactive}.subscribe((newValue) => { ${nodeName}.setAttribute("${attr}", ${processedClosure}) });`
+                }
             }
+        } else {
+            nodeDeclaration += `\n${indent}${nodeName}.setAttribute("${attr}", ${JSON.stringify(value)});`
         }
     }
 
     for (const child of node.childNodes) {
-        const {
-            nodeName: childNodeName,
-            nodeDeclaration: childNodeDeclaration,
-        } = processNode(processor, child as HTMLElement)
-        const indent = '    '.repeat(processor.indent)
-        nodeDeclaration += `\n${indent}${childNodeDeclaration}`
-        nodeDeclaration += `\n${indent}${nodeName}.appendChild(${childNodeName});`
+        const result = processNode(child as HTMLElement, ctx)
+        if (!result) {
+            continue
+        }
+        nodeDeclaration += `\n${indent}${result.nodeDeclaration}`
+        nodeDeclaration += `\n${indent}${nodeName}.appendChild(${result.nodeName});`
     }
-    processor.indent -= 1
+
+    ctx.indent -= 1
     return { nodeName, nodeDeclaration }
 }
