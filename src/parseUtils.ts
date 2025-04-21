@@ -1,4 +1,4 @@
-const reactiveClosurePattern = /^{{ ([^}]+) }}$/
+const reactiveClosurePattern = /^{{ (.*?) }}$/
 
 export function extractReactiveClosure(value: string): string | null {
     const matches = value.match(reactiveClosurePattern)

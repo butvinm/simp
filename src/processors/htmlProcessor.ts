@@ -23,7 +23,11 @@ function processNode(node: HTMLElement, ctx: SimpContext): NodeProcessorResult |
         case NodeType.TEXT_NODE:
             return convertTextNode(node, ctx)
         case NodeType.ELEMENT_NODE:
-            return convertElementNode(node, ctx)
+            if (node.rawTagName == 'foreach') {
+                return convertForeachNode(node, ctx)
+            } else {
+                return convertElementNode(node, ctx)
+            }
         default:
             return null
     }
@@ -50,6 +54,60 @@ function convertTextNode(node: HTMLElement, ctx: SimpContext): NodeProcessorResu
     return { nodeName, nodeDeclaration }
 }
 
+
+function convertForeachNode(node: HTMLElement, ctx: SimpContext): NodeProcessorResult | null {
+    const itemsAttr = node.rawAttributes["items"];
+    if (itemsAttr == undefined) return null
+
+    const itemAttr = node.rawAttributes["item"];
+    if (itemAttr == undefined) return null
+
+    const itemsClosure = extractReactiveClosure(itemsAttr)
+    if (itemsClosure == null) return null
+    const itemsReactives = extractClosureReactives(itemsClosure, ctx.reactives)
+    const itemsReactive = itemsReactives[0]
+    if (itemsReactive == undefined || itemsReactives.length != 1) return null
+
+    const itemClosure = extractReactiveClosure(itemAttr)
+    if (itemClosure == null) return null
+
+    ctx.reactives.add(itemClosure)
+
+    const nodeName = `foreach${ctx.elements}`
+
+    ctx.indent += 2
+    let indent = '    '.repeat(ctx.indent)
+
+    let itemDeclaration = `\n${indent}let ${itemClosure} = new ReactiveVariable("${itemClosure}", ${itemClosure}_value);`
+    for (const child of node.childNodes) {
+        console.log('buidling foreach item constructor node')
+        const result = processNode(child as HTMLElement, ctx)
+        if (!result) continue
+
+        itemDeclaration += `\n${indent}${result.nodeDeclaration}`
+        itemDeclaration += `\n${indent}${nodeName}.appendChild(${result.nodeName});`
+    }
+    itemDeclaration += `\n${indent}${itemClosure}.invoke();`
+
+    ctx.indent -= 2
+    indent = '    '.repeat(ctx.indent)
+
+    const itemConstructorName = `${nodeName}_createItem`;
+
+    let nodeDeclaration = `
+    ${indent}const ${nodeName} = document.createElement("div");
+    ${indent}${nodeName}.setAttribute("style", "display: contents");
+    ${indent}let ${itemClosure} = new ReactiveVariable("${itemClosure}", undefined);
+    ${indent}const ${itemConstructorName} = (${itemClosure}_value) => {
+    ${indent}${itemDeclaration}
+    ${indent}};
+    ${indent}${itemsReactive}.subscribe((newValue) => { ${nodeName}.innerHTML = ''; for (const item of newValue) ${itemConstructorName}(item) });
+    `
+
+    return { nodeName, nodeDeclaration }
+}
+
+
 function convertElementNode(node: HTMLElement, ctx: SimpContext): NodeProcessorResult {
     const rawTagName = node.rawTagName || 'body'
     const nodeName = `${rawTagName}${ctx.elements}`
@@ -66,6 +124,28 @@ function convertElementNode(node: HTMLElement, ctx: SimpContext): NodeProcessorR
             if (attr.startsWith('on:')) {
                 const eventName = attr.slice(3)
                 nodeDeclaration += `\n${indent}${nodeName}.addEventListener("${eventName}", (event) => { ${processedClosure} });`
+            } else if (attr.startsWith('bind:')) {
+                const attrName = attr.slice(5);
+
+                // Set initial value from the reactive to the element
+                nodeDeclaration += `\n${indent}${reactiveClosure}.subscribe((newValue) => {
+                    ${nodeName}["${attrName}"] = newValue;
+                });`;
+
+                // Add event listener to update the reactive when element changes
+                // Use appropriate event based on the element type and attribute
+                let eventType = "input"; // Default event for most input changes
+
+                // For some specific cases, use different events
+                if (rawTagName === "select" || (rawTagName === "input" &&
+                    (node.rawAttributes["type"] === "checkbox" || node.rawAttributes["type"] === "radio"))) {
+                    eventType = "change";
+                }
+
+                nodeDeclaration += `\n${indent}${nodeName}.addEventListener("${eventType}", (event) => {
+                    const newValue = ${nodeName}["${attrName}"];
+                    ${reactiveClosure}.set(newValue);
+                });`;
             } else {
                 const reactives = extractClosureReactives(reactiveClosure, ctx.reactives)
                 for (const reactive of reactives) {
