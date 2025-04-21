@@ -1,7 +1,15 @@
 <script>
     const x = 10
     let count = 0
-    console.log(count)
+
+    let todos = []
+    let newTodo = ''
+
+
+    const addNewTodo = () => {
+        todos = [...todos, newTodo];
+        newTodo = ''
+    }
 </script>
 
 <div class="wrapper">
@@ -14,6 +22,19 @@
             <button class="counter-btn" on:click="{{ count = count - 1 }}">Decrement</button>
             <p class="counter">{{ count }}</p>
             <button class="counter-btn" on:click="{{ count = count + 1 }}">Increment</button>
+        </div>
+        <div class="todo-wrapper">
+            <h2>Todo List:</h2>
+
+            <input class="todo-input" bind:value="{{ newTodo }}">
+
+            <button class="counter-btn" on:click="{{ addNewTodo() }}">Add</button>
+
+            <ul>
+                <foreach items="{{ todos }}" item="{{ todo }}">
+                    <li class="todo-item">{{ todo }}</li>
+                </foreach>
+            </ul>
         </div>
     </section>
     <footer class="footer">
@@ -89,6 +110,19 @@
     .counter {
         font-size: 3rem;
         color: crimson;
+    }
+
+    .todo-input {
+        padding: 1rem;
+        font-size: 1.5rem;
+        background-color: #ffffff;
+        border: 3px solid black;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+
+    .todo-item {
+        font-size: 1.5rem;
     }
 
     .footer {
