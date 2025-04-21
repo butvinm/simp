@@ -2,7 +2,7 @@ import { HTMLElement, NodeType } from 'node-html-parser'
 
 import { SimpContext } from './processor'
 import { extractReactiveClosure, extractClosureReactives } from '../parseUtils'
-import { processScript, processScriptNode } from './scriptProcessor'
+import { processScript } from './scriptProcessor'
 
 export function processHtmlNode(node: HTMLElement, ctx: SimpContext): string {
     const result = processNode(node, ctx)

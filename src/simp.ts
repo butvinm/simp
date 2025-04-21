@@ -72,28 +72,27 @@ function buildIndexJs(simpSource: string): string {
     return jsOutput
 }
 
-const OUT_DIR = 'simpDist'
-
 function main() {
-    if (process.argv.length < 3) {
-        console.log('Usage: simp <simp-file>')
+    if (process.argv.length != 4) {
+        console.log('Usage: simp <simp-file> <output-dir>')
         process.exit(1)
     }
 
     const simpFile = process.argv[2]!
+    const outDir = process.argv[3]!
 
     const simpSource = fs.readFileSync(simpFile, 'utf-8')
 
     const jsOutput = buildIndexJs(simpSource)
 
-    if (!fs.existsSync(OUT_DIR)) {
-        fs.mkdirSync(OUT_DIR)
+    if (!fs.existsSync(outDir)) {
+        fs.mkdirSync(outDir)
     }
 
-    const jsFile = path.join(OUT_DIR, 'index.js')
+    const jsFile = path.join(outDir, 'index.js')
     fs.writeFileSync(jsFile, jsOutput)
 
-    const htmlFile = path.join(OUT_DIR, 'index.html')
+    const htmlFile = path.join(outDir, 'index.html')
     fs.writeFileSync(htmlFile, INDEX_HTML)
 
     console.log(`Output written to ${jsFile}`)
